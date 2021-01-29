@@ -1,3 +1,4 @@
+#include <cctype>
 #include <vector>
 #include <unordered_map>
 #include <stdexcept>
@@ -7,17 +8,27 @@
 #include <map>
 #include <fstream>
 #include <chrono>
-#include <cctype>
 
+#include "fast_string.h"
 #include "mmap_file.h"
+
+#define GOTTA_GO_FAST
+
+#ifdef GOTTA_GO_FAST
+#include "absl/container/flat_hash_map.h"
+using Map = absl::flat_hash_map<FastString, size_t, FastString::Hasher>;
+#else
+using Map = std::unordered_map<FastString, size_t, FastString::Hasher>;
+#endif
 
 using InOutFiles = std::pair<std::string_view, std::string_view>;
 
 struct DictionaryNode {
+  DictionaryNode(std::string_view v, size_t f) : str(v), freq(f) {}
   std::string_view str;
   size_t freq;
 
-  bool operator<(DictionaryNode& node) {
+  bool operator<(const DictionaryNode& node) {
     if (freq == node.freq) {
       return str < node.str;
     }
@@ -25,6 +36,10 @@ struct DictionaryNode {
   }
 };
 
+
+bool is_alpha(const char c) {
+  return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ? 1 : 0);
+}
 
 InOutFiles parse_arguments(int argc, char** argv) {
   if (argc != 3) {
@@ -35,31 +50,30 @@ InOutFiles parse_arguments(int argc, char** argv) {
 }
 
 void run(int argc, char** argv) {
-  std::unordered_map<std::string, size_t> dictionary;
-  
+  Map dictionary(13370);
+
   auto [input_file, output_file] = parse_arguments(argc, argv);
   auto mmaped_file = MmapFile(input_file);
 
   auto file_data = mmaped_file.get_file_data();
 
-  char* start = file_data.data();
-  char* end = file_data.data();
-  char* eof = file_data.data() + file_data.size_bytes();
+  char* start = file_data.data;
+  char* end = file_data.data;
+  char* eof = file_data.data + file_data.size;
+  
   while (end != eof) {
-    if (isalpha(*end)) {
-      //*end = tolower(*end);
-      end++;
+    if (is_alpha(*end)) {
+      end++;      
     }
     else {
-      auto cur = std::string(start, end - start);
-      //std::transform(cur.begin(), cur.end(), cur.begin(), [](unsigned char c) { return std::tolower(c); });
+      FastString cur(start, end);
       if (auto it = dictionary.find(cur); it != dictionary.end()) {
         it->second++;
       } 
       else {
         dictionary.emplace_hint(it, std::move(cur), 1);
       }
-      while (end != eof && !isalpha(*end))
+      while (end != eof && !is_alpha(*end))
         end++;
       start = end;
     }
@@ -69,15 +83,21 @@ void run(int argc, char** argv) {
   nodes.reserve(dictionary.size());
   
   for (auto& node: dictionary) {
-    nodes.push_back({ node.first, node.second });
+    auto str = node.first.get_data();
+    nodes.emplace_back(str, node.second);
   }
   
   std::sort(nodes.begin(), nodes.end());
 
-  std::ofstream out_file(output_file, std::ofstream::trunc);
+  std::ofstream out_file(output_file, std::ofstream::trunc | std::ofstream::binary);
 
   for (auto& node : nodes) {
-    out_file << node.freq << " " << node.str << '\n';
+    out_file << node.freq;
+    out_file.put(' ');
+    for (auto c : node.str) {
+      out_file.put(to_lower(c));
+    }
+    out_file.put('\n');
   }
 }
 
