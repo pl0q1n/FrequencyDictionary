@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <string_view>
 #include <span>
+#include <immintrin.h>
 
 #include "hash.h"
 
@@ -171,30 +172,120 @@ namespace dirty_hacks {
     120,
     121,
     122 };
+
+
+  template <typename T, typename P>
+  T FancyLoad(const P* ptr) {
+    T val;
+    memcpy(&val, ptr, sizeof(val));
+    return val;
+  }
+
+  inline uint32_t hash_fn(const void* vdata, size_t bytes) {
+    auto data = (const uint8_t*)vdata;
+    uint64_t hash = 1337;
+    if (bytes >= 24) {
+      uint64_t a = hash,
+        b = hash,
+        c = hash;
+      size_t steps = bytes / 24;
+      while (steps-- > 0) {
+        a = _mm_crc32_u64(a, FancyLoad<uint64_t>(data + 0));
+        b = _mm_crc32_u64(b, FancyLoad<uint64_t>(data + 8));
+        c = _mm_crc32_u64(c, FancyLoad<uint64_t>(data + 16));
+        data += 24;
+      }
+      bytes %= 24;
+      hash = _mm_crc32_u32(a, _mm_crc32_u32(b, c));
+    }
+
+    if (bytes >= 16) {
+      hash = _mm_crc32_u64(hash, FancyLoad<uint64_t>(data));
+      bytes -= 8;
+      data += 8;
+    }
+
+    if (bytes & 8) {
+      hash = _mm_crc32_u64(hash, FancyLoad<uint64_t>(data));
+      data += 8;
+    }
+    auto hash32 = (uint32_t)hash;
+
+    if (bytes & 4) {
+      hash32 = _mm_crc32_u32(hash32, FancyLoad<uint32_t>(data));
+      data += 4;
+    }
+    if (bytes & 2) {
+      hash32 = _mm_crc32_u16(hash32, FancyLoad<uint16_t>(data));
+      data += 2;
+    }
+    if (bytes & 1) {
+      hash32 = _mm_crc32_u8(hash32, FancyLoad<uint8_t>(data));
+    }
+    return hash32;
+  }
 }
+
 char to_lower(const char c) {
   return dirty_hacks::to_lower_lookup[c];
-  //return c | (1 << 5);
+}
+
+
+constexpr std::uint64_t SEED = 0x517cc1b727220a95;
+unsigned leftRotate(unsigned n, unsigned d) {
+  return (n << d) | (n >> (32 - d));
+}
+
+std::uint64_t hashWord(std::uint64_t x, std::uint64_t word) {
+  return (leftRotate(x, 5) ^ word) * SEED;
+}
+
+std::uint64_t hash_fn(const char* bytes, int len) {
+  uint64_t hash = 0;
+  size_t offset = 0;
+  while (len >= 8) {
+    hash = hashWord(hash, dirty_hacks::FancyLoad<uint64_t>(bytes + offset));
+    offset += 8;
+    len -= 8;
+  }
+
+  if (len >= 4) {
+    hash = hashWord(hash, dirty_hacks::FancyLoad<uint32_t>(bytes + offset));
+    offset += 4;
+    len -= 4;
+  }
+
+  if (len >= 2) {
+    hash = hashWord(hash, dirty_hacks::FancyLoad<uint16_t>(bytes + offset));
+    offset += 2;
+    len -= 2;
+  }
+
+  if (len == 1) {
+    hash = hashWord(hash, dirty_hacks::FancyLoad<uint8_t>(bytes + offset));
+    len--;
+  }
+
+  return hash;
 }
 
 unsigned int CRC32_function(const char* buf, unsigned long len)
 {
-  uint32_t crc = 0xffffffff;
+  //uint32_t crc = 0xffffffff;
+  //
+  //while (len-- != 0) crc = dirty_hacks::poly8_lookup[((uint8_t)crc ^ static_cast<unsigned char>(*(buf++)))] ^ (crc >> 8);
+  //// return (~crc); also works
+  //return (crc ^ 0xffffffff);
 
-  while (len-- != 0) crc = dirty_hacks::poly8_lookup[((uint8_t)crc ^ static_cast<unsigned char>(to_lower(*(buf++))))] ^ (crc >> 8);
-  // return (~crc); also works
-  return (crc ^ 0xffffffff);
+  return hash_fn(buf, len);
 }
 
-bool compareChar(const char c1, const char c2)
-{
-  if (c1 == c2)
-    return true;
-  else if (to_lower(c1) == to_lower(c2))
-    return true;
-  return false;
-}
-
+struct FancyHasher {
+  std::size_t operator()(const std::string_view& sv) const
+  {
+    return CRC32_function(sv.data(), sv.size());
+  }
+};
 
 class FastString {
 public:
@@ -208,33 +299,11 @@ public:
   };
 
   bool operator<(const FastString& fs) const {
-    auto min_size = std::min(fs._data.size(), _data.size());
-    for (int i = 0; i < min_size; i++) {
-      if (fs._data[i] > _data[i]) {
-        return true;
-      }
-      else if (fs._data[i] < _data[i]) {
-        return false;
-      }
-    }
-
-    if (fs._data.size() < _data.size()) {
-      return false;
-    }
-    else {
-      return true;
-    }
+    return fs._data < _data;
   }
 
   bool operator==(const FastString& fs) const {
-    return ((_data.size() == fs._data.size()) &&
-      std::equal(_data.cbegin(), _data.cend(), fs._data.cbegin(), [](const char c1, const char c2) {
-        if (c1 == c2)
-          return true;
-        else if (to_lower(c1) == to_lower(c2))
-          return true;
-        return false; 
-      }));
+    return fs._data == _data;
   }
 
 

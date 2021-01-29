@@ -21,23 +21,23 @@ public:
 
 		HANDLE hMap;
 		char* data_ptr = NULL;
-		HANDLE hFile = CreateFileA(file_path.string().c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL,
+		HANDLE hFile = CreateFileA(file_path.string().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
 			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (hFile == INVALID_HANDLE_VALUE) {
 			return;
 		}
-		//auto size = GetFileSize(hFile, NULL);
+
 		if (size == INVALID_FILE_SIZE || size == 0) {
 			return;
 		}
 
-		hMap = CreateFileMappingA(hFile, NULL, PAGE_READWRITE, 0, size, NULL);
+		hMap = CreateFileMappingA(hFile, NULL, PAGE_WRITECOPY, 0, size, NULL);
 		if (!hMap)
 		{
 			return;
 		}
 
-		data_ptr = (char*)MapViewOfFile(hMap, FILE_MAP_ALL_ACCESS, 0, 0, size);
+		data_ptr = (char*)MapViewOfFile(hMap, FILE_MAP_COPY, 0, 0, size);
 
 		// Closing handle will not affect viewed data 
 		CloseHandle(hMap);
