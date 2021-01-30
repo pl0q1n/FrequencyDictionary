@@ -8,7 +8,10 @@
 #include <iostream>
 #include <utility>
 #include <string_view>
+#include <algorithm>
+#include <fstream>
 
+// uncomment if you want to see more perfomance (abseil should be linked and included)
 #define GOTTA_GO_FAST
 
 #ifdef GOTTA_GO_FAST
@@ -26,7 +29,7 @@ struct DictionaryNode {
   std::string_view str;
   int freq;
 
-  bool operator<(const DictionaryNode& node) {
+  bool operator<(const DictionaryNode& node) const {
     if (freq == node.freq) {
       return str < node.str;
     }
@@ -50,15 +53,15 @@ void run(int argc, const char** argv) {
   Map dictionary(13370);
 
   const auto [input_file, output_file] = parse_arguments(argc, argv);
-  auto mmaped_file = MmapFile(input_file);
+  auto mmaped_file = MmapFile(std::filesystem::path(input_file));
 
   auto file_data = mmaped_file.get_file_data();
 
   char* start = file_data.data;
   char* end = file_data.data;
   const char* eof = file_data.data + file_data.size;
-  
-  // computer science dudes love to put file signatures into files, so we need to skip it. 
+
+  // computer science dudes love to put file signatures into files, so we need to skip it.
   while (!is_alpha(*start)) {
     start++;
   }
@@ -73,7 +76,7 @@ void run(int argc, const char** argv) {
 
     auto count = end - start;
     auto str = std::string_view(start, count);
-    
+
     const Key key(str, dirty_hacks::hash_fn_fnv(start, count));
 
     // for some reason, dictionary.find + insert is faster than dictionary[str]++ or find + emplace_hint
@@ -100,7 +103,7 @@ void run(int argc, const char** argv) {
 
   // std::cout << dictionary.load_factor() << std::endl;
   std::sort(nodes.begin(), nodes.end());
-  std::ofstream out_file(output_file, std::ofstream::trunc | std::ofstream::binary);
+  std::ofstream out_file(output_file.data(), std::ofstream::trunc | std::ofstream::binary);
 
   for (const auto& n : nodes) {
     out_file << n.freq << ' ' << n.str << '\n';

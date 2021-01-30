@@ -4,8 +4,8 @@
 #include <immintrin.h>
 
 namespace dirty_hacks {
-  char to_lower_lookup[] = 
-  { 
+  char to_lower_lookup[] =
+  {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107,
@@ -34,8 +34,8 @@ struct Key {
   std::string_view str;
   uint64_t hash;
 
-  bool operator==(const Key& s) const 
-  { 
+  bool operator==(const Key& s) const
+  {
     return s.str == str;
   }
   Key(std::string_view s, uint64_t h) : str(s), hash(h) {}
