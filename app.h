@@ -14,10 +14,9 @@
 
 #ifdef GOTTA_GO_FAST
 #include "absl/container/flat_hash_map.h"
-//using Map = absl::flat_hash_map<FastString, size_t, FastString::Hasher>;
 using Map = absl::flat_hash_map<std::string_view, size_t, FancyHasher>;
 #else
-using Map = std::unordered_map<FastString, size_t, FastString::Hasher>;
+using Map = std::unordered_map<std::string_view, size_t, FancyHasher>;
 #endif
 
 using InOutFiles = std::pair<std::string_view, std::string_view>;
@@ -65,7 +64,16 @@ void run(int argc, const char** argv) {
       end++;
     }
     else {
-      dictionary[std::string_view(start, end - start)] += 1;
+      auto str = std::string_view(start, end - start);
+      
+      auto it = dictionary.find(str);
+      if (it == dictionary.end()) {
+        it = dictionary.insert(it, { str, 1 });
+      }
+      else {
+        ++(it->second);
+      }
+      //dictionary[str] += 1;
       while (end != eof && !is_alpha(*end))
         end++;
       start = end;
@@ -79,8 +87,8 @@ void run(int argc, const char** argv) {
     nodes.emplace_back(node.first, node.second);
   }
 
+  // std::cout << dictionary.load_factor() << std::endl;
   std::sort(nodes.begin(), nodes.end());
-
   std::ofstream out_file(output_file, std::ofstream::trunc | std::ofstream::binary);
 
   for (const auto& n : nodes) {

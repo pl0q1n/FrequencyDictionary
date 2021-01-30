@@ -3,9 +3,8 @@
 #include <span>
 #include <immintrin.h>
 
-#include "hash.h"
-
 namespace dirty_hacks {
+  constexpr std::uint64_t SEED = 0x517cc1b727220a95;
 
   uint32_t poly8_lookup[256] =
   {
@@ -75,104 +74,21 @@ namespace dirty_hacks {
    0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
   };
 
-  char to_lower_lookup[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    97,
-    98,
-    99,
-    100,
-    101,
-    102,
-    103,
-    104,
-    105,
-    106,
-    107,
-    108,
-    109,
-    110,
-    111,
-    112,
-    113,
-    114,
-    115,
-    116,
-    117,
-    118,
-    119,
-    120,
-    121,
-    122,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    97,
-    98,
-    99,
-    100,
-    101,
-    102,
-    103,
-    104,
-    105,
-    106,
-    107,
-    108,
-    109,
-    110,
-    111,
-    112,
-    113,
-    114,
-    115,
-    116,
-    117,
-    118,
-    119,
-    120,
-    121,
-    122 };
-
+  // to lower and to alpha lookup
+  char to_lower_lookup[] = 
+  { 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107,
+    108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 0, 0, 0,
+    0, 0, 0, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+    110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+  };
 
   template <typename T, typename P>
   T FancyLoad(const P* ptr) {
@@ -181,9 +97,9 @@ namespace dirty_hacks {
     return val;
   }
 
-  inline uint32_t hash_fn(const void* vdata, size_t bytes) {
+  inline uint32_t hash_fn_crc(const void* vdata, size_t bytes) {
     auto data = (const uint8_t*)vdata;
-    uint64_t hash = 1337;
+    uint64_t hash = SEED;
     if (bytes >= 24) {
       uint64_t a = hash,
         b = hash,
@@ -224,94 +140,38 @@ namespace dirty_hacks {
     }
     return hash32;
   }
+  
+
+  unsigned hash_fn_kiss(const char* bytes, int len) {
+    auto hash = 0;
+    while (len--) {
+      hash = (2166136261 * hash) ^ (*bytes++);
+    }
+    return hash;
+  }
+
 }
 
 char to_lower(const char c) {
   return dirty_hacks::to_lower_lookup[c];
 }
 
-
-constexpr std::uint64_t SEED = 0x517cc1b727220a95;
-unsigned leftRotate(unsigned n, unsigned d) {
-  return (n << d) | (n >> (32 - d));
-}
-
-std::uint64_t hashWord(std::uint64_t x, std::uint64_t word) {
-  return (leftRotate(x, 5) ^ word) * SEED;
-}
-
-std::uint64_t hash_fn(const char* bytes, int len) {
-  uint64_t hash = 0;
-  size_t offset = 0;
-  while (len >= 8) {
-    hash = hashWord(hash, dirty_hacks::FancyLoad<uint64_t>(bytes + offset));
-    offset += 8;
-    len -= 8;
-  }
-
-  if (len >= 4) {
-    hash = hashWord(hash, dirty_hacks::FancyLoad<uint32_t>(bytes + offset));
-    offset += 4;
-    len -= 4;
-  }
-
-  if (len >= 2) {
-    hash = hashWord(hash, dirty_hacks::FancyLoad<uint16_t>(bytes + offset));
-    offset += 2;
-    len -= 2;
-  }
-
-  if (len == 1) {
-    hash = hashWord(hash, dirty_hacks::FancyLoad<uint8_t>(bytes + offset));
-    len--;
-  }
-
-  return hash;
-}
-
 unsigned int CRC32_function(const char* buf, unsigned long len)
 {
-  //uint32_t crc = 0xffffffff;
-  //
-  //while (len-- != 0) crc = dirty_hacks::poly8_lookup[((uint8_t)crc ^ static_cast<unsigned char>(*(buf++)))] ^ (crc >> 8);
-  //// return (~crc); also works
-  //return (crc ^ 0xffffffff);
-
-  return hash_fn(buf, len);
+  uint32_t crc = 0xffffffff;
+  
+  while (len-- != 0) crc = dirty_hacks::poly8_lookup[((uint8_t)crc ^ static_cast<unsigned char>(*(buf++)))] ^ (crc >> 8);
+  // return (~crc); also works
+  return (crc ^ 0xffffffff);
 }
 
 struct FancyHasher {
   std::size_t operator()(const std::string_view& sv) const
   {
-    return CRC32_function(sv.data(), sv.size());
+    //return CRC32_function(sv.data(), sv.size());
+    //return dirty_hacks::hash_fn_crc(sv.data(), sv.size());
+    return dirty_hacks::hash_fn_kiss(sv.data(), sv.size());
   }
 };
 
-class FastString {
-public:
-  FastString(std::string_view view) : _data(view) { }
-  FastString(const char* start, const char* end) : _data(start, end - start) {}
-  struct Hasher {
-    std::size_t operator()(const FastString& fs) const
-    {
-      return CRC32_function(fs._data.data(), fs._data.size());
-    }
-  };
-
-  bool operator<(const FastString& fs) const {
-    return fs._data < _data;
-  }
-
-  bool operator==(const FastString& fs) const {
-    return fs._data == _data;
-  }
-
-
-  std::string_view get_data() const {
-    return _data;
-  }
-
-private:
-  std::string_view _data;
-};
 
