@@ -14,28 +14,15 @@
 #ifdef GOTTA_GO_FAST
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #include "absl/container/flat_hash_map.h"
-using Map = absl::flat_hash_map<std::string_view, int, FancyHasher>;
+using Map = absl::flat_hash_map<Key, int, KeyHasher>;
 #else
-using Map = std::unordered_map<std::string_view, int, FancyHasher>;
+using Map = std::unordered_map<Key, int, KeyHasher>;
 #endif
 
 using InOutFiles = std::pair<std::string_view, std::string_view>;
 
-struct Key {
-  std::string_view str;
-  uint64_t hash;
-
-  Key(std::string_view s, uint64_t h) : str(s), hash(h) {}
-};
-
-struct KeyHasher {
-  uint64_t operator()(const Key& key) {
-    return key.hash;
-  }
-};
-
 struct DictionaryNode {
-  DictionaryNode(std::string_view v, int f) : str(v), freq(f) {}
+  DictionaryNode(const std::string_view v, const int f) : str(v), freq(f) {}
   std::string_view str;
   int freq;
 
@@ -84,13 +71,15 @@ void run(int argc, const char** argv) {
       continue;
     }
 
-    const auto str = std::string_view(start, end - start);
+    auto count = end - start;
+    auto str = std::string_view(start, count);
     
+    const Key key(str, dirty_hacks::hash_fn_kiss(start, count));
     // for some reason, dictionary.find + insert is faster than dictionary[str]++ or find + emplace_hint
     // in this case, find + insert will trigger double hash calculating, so we should eluminate this overhead.
-    auto it = dictionary.find(str);
+    auto it = dictionary.find(key);
     if (it == dictionary.end()) {
-      it = dictionary.insert(it, { str, 1 });
+      it = dictionary.insert(it, { key, 1 });
     }
     else {
       it->second++;
@@ -105,7 +94,7 @@ void run(int argc, const char** argv) {
   nodes.reserve(dictionary.size());
 
   for (auto& node : dictionary) {
-    nodes.emplace_back(node.first, node.second);
+    nodes.emplace_back(node.first.str, node.second);
   }
 
   // std::cout << dictionary.load_factor() << std::endl;

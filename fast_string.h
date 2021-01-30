@@ -152,6 +152,20 @@ namespace dirty_hacks {
 
 }
 
+struct Key {
+  std::string_view str;
+  uint64_t hash;
+
+  bool operator==(const Key& s) const { return s.str == str; }
+  Key(std::string_view s, uint64_t h) : str(s), hash(h) {}
+};
+
+struct KeyHasher {
+  size_t operator()(const Key& key) const {
+    return key.hash;
+  }
+};
+
 char to_lower(const char c) {
   return dirty_hacks::to_lower_lookup[c];
 }
