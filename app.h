@@ -49,35 +49,36 @@ InOutFiles parse_arguments(int argc, const char** argv) {
 void run(int argc, const char** argv) {
   Map dictionary(13370);
 
-  auto [input_file, output_file] = parse_arguments(argc, argv);
+  const auto [input_file, output_file] = parse_arguments(argc, argv);
   auto mmaped_file = MmapFile(input_file);
 
   auto file_data = mmaped_file.get_file_data();
 
   char* start = file_data.data;
   char* end = file_data.data;
-  char* eof = file_data.data + file_data.size;
+  const char* eof = file_data.data + file_data.size;
 
   while (end != eof) {
     if (is_alpha(*end)) {
       *end = to_lower(*end);
       end++;
+      continue;
+    }
+
+    const auto str = std::string_view(start, end - start);
+    
+    // for some reason, dictionary.find + insert is faster than dictionary[str]++ or find + emplace_hint
+    auto it = dictionary.find(str);
+    if (it == dictionary.end()) {
+      it = dictionary.insert(it, { str, 1 });
     }
     else {
-      auto str = std::string_view(start, end - start);
-      
-      auto it = dictionary.find(str);
-      if (it == dictionary.end()) {
-        it = dictionary.insert(it, { str, 1 });
-      }
-      else {
-        ++(it->second);
-      }
-      //dictionary[str] += 1;
-      while (end != eof && !is_alpha(*end))
-        end++;
-      start = end;
+      it->second++;
     }
+
+    while (end != eof && !is_alpha(*end))
+      end++;
+    start = end;
   }
 
   std::vector<DictionaryNode> nodes;
