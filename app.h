@@ -1,5 +1,4 @@
 #pragma once
-
 #include "fast_string.h"
 #include "mmap_file.h"
 
@@ -13,18 +12,32 @@
 #define GOTTA_GO_FAST
 
 #ifdef GOTTA_GO_FAST
+#define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #include "absl/container/flat_hash_map.h"
-using Map = absl::flat_hash_map<std::string_view, size_t, FancyHasher>;
+using Map = absl::flat_hash_map<std::string_view, int, FancyHasher>;
 #else
-using Map = std::unordered_map<std::string_view, size_t, FancyHasher>;
+using Map = std::unordered_map<std::string_view, int, FancyHasher>;
 #endif
 
 using InOutFiles = std::pair<std::string_view, std::string_view>;
 
-struct DictionaryNode {
-  DictionaryNode(std::string_view v, size_t f) : str(v), freq(f) {}
+struct Key {
   std::string_view str;
-  size_t freq;
+  uint64_t hash;
+
+  Key(std::string_view s, uint64_t h) : str(s), hash(h) {}
+};
+
+struct KeyHasher {
+  uint64_t operator()(const Key& key) {
+    return key.hash;
+  }
+};
+
+struct DictionaryNode {
+  DictionaryNode(std::string_view v, int f) : str(v), freq(f) {}
+  std::string_view str;
+  int freq;
 
   bool operator<(const DictionaryNode& node) {
     if (freq == node.freq) {
@@ -57,6 +70,12 @@ void run(int argc, const char** argv) {
   char* start = file_data.data;
   char* end = file_data.data;
   const char* eof = file_data.data + file_data.size;
+  
+  // computer science dudes love to put file signatures into files, so we need to skip it. 
+  while (!is_alpha(*start)) {
+    start++;
+  }
+  end = start;
 
   while (end != eof) {
     if (is_alpha(*end)) {
@@ -68,6 +87,7 @@ void run(int argc, const char** argv) {
     const auto str = std::string_view(start, end - start);
     
     // for some reason, dictionary.find + insert is faster than dictionary[str]++ or find + emplace_hint
+    // in this case, find + insert will trigger double hash calculating, so we should eluminate this overhead.
     auto it = dictionary.find(str);
     if (it == dictionary.end()) {
       it = dictionary.insert(it, { str, 1 });
