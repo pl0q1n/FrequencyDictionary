@@ -74,7 +74,8 @@ void run(int argc, const char** argv) {
     auto count = end - start;
     auto str = std::string_view(start, count);
     
-    const Key key(str, dirty_hacks::hash_fn_kiss(start, count));
+    const Key key(str, dirty_hacks::hash_fn_fnv(start, count));
+
     // for some reason, dictionary.find + insert is faster than dictionary[str]++ or find + emplace_hint
     // in this case, find + insert will trigger double hash calculating, so we should eluminate this overhead.
     auto it = dictionary.find(key);
