@@ -1,10 +1,8 @@
 ﻿#pragma once
 #include <string_view>
-#include <span>
-#include <immintrin.h>
 
 namespace dirty_hacks {
-  char to_lower_lookup[] =
+  static inline char to_lower_lookup[] =
   {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -18,8 +16,8 @@ namespace dirty_hacks {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
   };
-
-  unsigned hash_fn_fnv(const char* buf, int len) {
+ 
+  static inline unsigned hash_fn_fnv(const char* buf, int len) {
     auto hash = 0x811C9DC5;
     while (len--)
     {
@@ -27,26 +25,43 @@ namespace dirty_hacks {
     }
     return hash;
   }
+}
 
+static inline bool is_alpha(const char c) {
+  return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ? 1 : 0);
+}
+
+static inline char to_lower(const char c) {
+  return dirty_hacks::to_lower_lookup[c];
 }
 
 struct Key {
   std::string_view str;
-  uint64_t hash;
+  uint32_t hash;
 
-  bool operator==(const Key& s) const
+  bool operator==(const Key& s) const 
   {
-    return s.str == str;
+    int size = str.size();
+    if (size != s.str.size()) {
+      return false;
+    }
+    // this implementation of fnv hash doesn't create collisions on any
+    // combinations of letters (a-z) with length that less than 6.
+    // so if we want to check 2 keys from the same bucket
+    // we could do it with little hack: we don't need check 
+    // strings that have less than 6 symbols.
+    if (size < 6) {
+      return true;
+    }
+
+    return str == s.str;
   }
-  Key(std::string_view s, uint64_t h) : str(s), hash(h) {}
+
+  Key(const std::string_view s, const uint32_t h) : str(s), hash(h) {}
 };
 
 struct KeyHasher {
-  size_t operator()(const Key& key) const {
+  uint32_t operator()(const Key& key) const {
     return key.hash;
   }
 };
-
-char to_lower(const char c) {
-  return dirty_hacks::to_lower_lookup[c];
-}

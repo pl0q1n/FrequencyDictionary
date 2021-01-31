@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.5)
-project(freq)
+project(FreqDictionary)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_subdirectory(abseil-cpp)
+add_executable(FreqDictionary main.cpp app.h mmap_file.h utils.h 3rdParty/pqsort.h)
 
-add_executable(freq main.cpp app.h mmap_file.h fast_string.h)
-target_link_libraries(freq absl::base absl::flat_hash_map)
-
-target_compile_options(freq PRIVATE "-O3")
+if (FAST)
+add_definitions(-DGOTTA_GO_FAST)
+add_subdirectory(3rdParty/abseil-cpp)
+target_link_libraries(FreqDictionary absl::flat_hash_map)
+endif()
