@@ -25,7 +25,7 @@ public:
 #ifdef _WIN32
 	MmapFile(const std::filesystem::path& file_path) {
 		if (!std::filesystem::exists(file_path)) {
-			throw std::runtime_error("File doesn't exist");
+			throw std::runtime_error("Input file doesn't exist");
 		}
 		size_t size = std::filesystem::file_size(file_path);
 
@@ -75,7 +75,7 @@ public:
 	~MmapFile() {
 		UnmapViewOfFile(data.data);
 	}
-#else 
+#else
 	~MmapFile() {
 		munmap(data.data, data.size);
 	}
